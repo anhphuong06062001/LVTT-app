@@ -7,12 +7,14 @@ from tensorflow.keras.models import load_model
 from sklearn.preprocessing import StandardScaler
 import numpy as np
 from streamlit_option_menu import option_menu
-
-
+from function import func
+from streamlit_lottie import st_lottie
 ############LOAD MODEL###############
-model = load_model('model\lstm_model-v1.h5')
-scaler = joblib.load('model\scaler.joblib')
+model_up = load_model('model\lstm_model-v2.h5')
+scaler_up = joblib.load('model\scaler.joblib')
 
+model_down = load_model('model\lstm_model-DOWN.h5')
+scaler_down = joblib.load('model\scaler_down.joblib')
 def create_time_series_data(data, column_name, id_col,date_col,n_steps, n_forecast):
       X = []
       Y = []
@@ -20,7 +22,7 @@ def create_time_series_data(data, column_name, id_col,date_col,n_steps, n_foreca
       ngay_kh = []
 
       data[column_name] = data[column_name] / 1000000 
-      data[column_name] = scaler.fit_transform(data[column_name].values.reshape(-1, 1))
+      data[column_name] = scaler_up.fit_transform(data[column_name].values.reshape(-1, 1))
 
       for customer_id, group in data.groupby(id_col):
             customer_data = group.sort_values(by=date_col)
@@ -44,13 +46,26 @@ def create_time_series_data(data, column_name, id_col,date_col,n_steps, n_foreca
       ngay_kh = np.array(ngay_kh)
       return X, Y, customer_ids, ngay_kh
 
-def predict_churn(x_test, y_test, id_test, ngay_test):
-      predictions = model.predict(x_test)
+def predict_churn_up(x_test, y_test, id_test, ngay_test):
+      predictions = model_up.predict(x_test)
 
-      predictions_inverse = scaler.inverse_transform(predictions.reshape(-1, 1))
-      y_test_inverse = scaler.inverse_transform(y_test.reshape(-1, 1))
-      id_test = id_test_up.reshape(-1, 1)
-      ngay_test = ngay_test_up.reshape(-1, 1)
+      predictions_inverse = scaler_up.inverse_transform(predictions.reshape(-1, 1))
+      y_test_inverse = scaler_up.inverse_transform(y_test.reshape(-1, 1))
+      id_test = id_test.reshape(-1, 1)
+      ngay_test = ngay_test.reshape(-1, 1)
+      ngay_test = pd.to_datetime(ngay_test[:,0])
+      st.subheader(f'Kết quả dự đoán:')
+      result = pd.DataFrame(data={'KHACHHANG_ID': id_test[:,0],'NGAY': ngay_test,'Actuals': y_test_inverse[:,0], 'Predictions':predictions_inverse[:,0]})
+
+      return result
+
+def predict_churn_down(x_test, y_test, id_test, ngay_test):
+      predictions = model_down.predict(x_test)
+
+      predictions_inverse = scaler_down.inverse_transform(predictions.reshape(-1, 1))
+      y_test_inverse = scaler_down.inverse_transform(y_test.reshape(-1, 1))
+      id_test = id_test.reshape(-1, 1)
+      ngay_test = ngay_test.reshape(-1, 1)
       ngay_test = pd.to_datetime(ngay_test[:,0])
       st.subheader(f'Kết quả dự đoán:')
       result = pd.DataFrame(data={'KHACHHANG_ID': id_test[:,0],'NGAY': ngay_test,'Actuals': y_test_inverse[:,0], 'Predictions':predictions_inverse[:,0]})
@@ -109,17 +124,11 @@ if 'df' not in st.session_state:
     st.session_state.df = None
 
 
-
-# page = st.sidebar.selectbox(
-#     'Navigation',
-#     ['Home', 'Import Data', 'Draw Chart', 'Prediction'],
-# )
-
 with st.sidebar:
       selected = option_menu(
             menu_title = "Main Menu",
-            options = ['Home', 'Import Data', 'Draw Chart', 'Prediction'],
-            icons=["house", "cloud-upload", "envelope", "list-task"],
+            options = ['Home', 'Import Data', 'Draw Chart', 'Prediction', 'Feedback'],
+            icons=["house", "cloud-upload", "envelope", "list-task", "people-fill"],
             menu_icon="cast",
       )
 
@@ -127,6 +136,18 @@ if selected == 'Home':
       # session_state.page = 'Home'
       st.title('Welcome to Customer Churn Prediction App')
       st.write('This app helps you analyze and predict customer churn.')
+      lottie_hello = func.load_lottiefile("jsonlottie/hello.json")
+      st_lottie(
+           lottie_hello,
+           speed=1, 
+           reverse=False,
+           loop=True, 
+           quality="medium",
+           height=500,
+           width=1000, 
+           key=None  
+      )
+      
 
 elif selected == 'Import Data':   
       # session_state.page = 'Import Data'
@@ -182,9 +203,44 @@ elif selected == 'Prediction':
             data_column = st.selectbox("Select data for predict", columns)
             customer_id_column = st.selectbox("Select column for Customer ID", columns)
             date_column = st.selectbox("Select data for time serise", columns)
+            selected_model = st.selectbox("Select Machine Learning Model", ["LSTM for Upload", "LSTM for Download"])
+
             if st.button('Predict'):
-                  X_UP_test, y_UP_test, id_test_up, ngay_test_up = create_time_series_data(st.session_state.df, data_column, customer_id_column, date_column, 23, 7)
-                  X_test_up = np.reshape(X_UP_test, (X_UP_test.shape[0],X_UP_test.shape[1], 1))
-                  kq = predict_churn(X_test_up, y_UP_test, id_test_up, ngay_test_up)
-                  st.write(kq)
-      
+                  X_test, y_test, id_test, ngay_test = create_time_series_data(st.session_state.df, data_column, customer_id_column, date_column, 23, 7)
+                  X_test_up = np.reshape(X_test, (X_test.shape[0],X_test.shape[1], 1))
+                  
+                  if selected_model == "LSTM for Upload":
+                        kq = predict_churn_up(X_test_up, y_test, id_test, ngay_test)
+                        st.write(kq)
+                  elif selected_model == "LSTM for Download":
+                        kq = predict_churn_down(X_test_up, y_test, id_test, ngay_test)
+                        st.write(kq)
+
+elif selected == 'Feedback':
+      st.header(":mailbox: Please give me your comments to help me improve the application!!!")
+
+      contact_form = """
+            <form action="https://formsubmit.co/anhphuong06062001@gmail.com" method="POST">
+                  <input type="hidden" name="_captcha" value="false">
+                  <input type="text" name="name" placeholder="Your name" required>
+                  <input type="email" name="email" placeholder="Your email" required>
+                  <textarea name="message" placeholder="Detail your feedback"></textarea>
+                  <button type="submit">Send</button>
+            </form>
+      """
+
+      st.markdown(contact_form, unsafe_allow_html=True)
+
+      func.load_css("css/style.css")
+
+      lottie_coding = func.load_lottiefile("jsonlottie/coding.json")
+      st_lottie(
+           lottie_coding,
+           speed=1, 
+           reverse=False,
+           loop=True, 
+           quality="medium",
+           height=200,
+           width=1800, 
+           key=None  
+      )
