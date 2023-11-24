@@ -139,7 +139,7 @@ elif selected == 'Import Data':
                         lable_col = st.selectbox("Select data for lable", columns)
                         date_col = st.selectbox("Select data for date", columns)
                         if st.form_submit_button("Draw"):
-                              draw.show_data_info(st.session_state.df, unique_customers ,lable_col, id_col, date_col)
+                              st.session_state.chart = draw.show_data_info(st.session_state.df, unique_customers ,lable_col, id_col, date_col)
                   #     st.session_state.show = kq
       
             else:
@@ -149,6 +149,7 @@ elif selected == 'Import Data':
                         st.session_state.custumer = st.session_state.df[st.session_state.id_col].unique()  
                         st.session_state.lable = st.selectbox("Select data for lable", columns)
                         st.session_state.date = st.selectbox("Select data for date", columns)
+                        
                         if st.form_submit_button("Draw"):
                               st.session_state.chart = draw.show_data_info(st.session_state.df, st.session_state.custumer ,st.session_state.lable, st.session_state.id_col, st.session_state.date)
       # st.write(st.session_state.chart)
