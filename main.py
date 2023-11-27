@@ -16,13 +16,16 @@ scaler_up = joblib.load('model\scaler.joblib')
 
 model_down = load_model('model\lstm_model-DOWN.h5')
 scaler_down = joblib.load('model\scaler_down.joblib')
-def create_time_series_data(data, column_name, id_col,date_col,n_steps, n_forecast):
+def create_time_series_data(data, column_name, id_col,date_col, date_churn, label_col, n_steps, n_forecast):
       X = []
       Y = []
       customer_ids = []
       ngay_kh = []
+      ngay_thanhly = []
+      nhan = []
 
       data[column_name] = data[column_name] / 1000000 
+      data[column_name] = data[column_name].astype(int)
       data[column_name] = scaler_up.fit_transform(data[column_name].values.reshape(-1, 1))
 
       for customer_id, group in data.groupby(id_col):
@@ -35,19 +38,24 @@ def create_time_series_data(data, column_name, id_col,date_col,n_steps, n_foreca
                   Y_data = customer_data[column_name].iloc[i + n_steps:i + n_steps + n_forecast].to_numpy()
                   id = customer_data[id_col].iloc[i + n_steps:i + n_steps + n_forecast].to_numpy()
                   ngay = customer_data[date_col].iloc[i + n_steps:i + n_steps + n_forecast].to_numpy()
-           
+                  ngay_tl = customer_data[date_churn].iloc[i + n_steps:i + n_steps + n_forecast].to_numpy()
+                  nhan_tl = customer_data[lable_col].iloc[i + n_steps:i + n_steps + n_forecast].to_numpy()
                   X.append(X_data)
                   Y.append(Y_data)
                   customer_ids.append(id)
                   ngay_kh.append(ngay)
+                  ngay_thanhly.append(ngay_tl)
+                  nhan.append(nhan_tl)
      
       X = np.array(X)
       Y = np.array(Y)
       customer_ids = np.array(customer_ids)
       ngay_kh = np.array(ngay_kh)
-      return X, Y, customer_ids, ngay_kh
+      ngay_thanhly = np.array(ngay_thanhly)
+      nhan = np.array(nhan)
+      return X, Y, customer_ids, ngay_kh, ngay_thanhly, nhan
 
-def predict_churn_up(x_test, y_test, id_test, ngay_test):
+def predict_churn_up(x_test, y_test, id_test, ngay_test, ngay_thanhly, nhan):
       predictions = model_up.predict(x_test)
 
       predictions_inverse = scaler_up.inverse_transform(predictions.reshape(-1, 1))
@@ -55,30 +63,60 @@ def predict_churn_up(x_test, y_test, id_test, ngay_test):
       id_test = id_test.reshape(-1, 1)
       ngay_test = ngay_test.reshape(-1, 1)
       ngay_test = pd.to_datetime(ngay_test[:,0])
+      ngay_thanhly_test = ngay_thanhly.reshape(-1,1)
+      ngay_thanhly_test = pd.to_datetime(ngay_thanhly_test[:,0])
+      nhan_up_test = nhan.reshape(-1,1)
       st.subheader(f'Kết quả dự đoán:')
-      result = pd.DataFrame(data={'KHACHHANG_ID': id_test[:,0],'NGAY': ngay_test,'Actuals': y_test_inverse[:,0], 'Predictions':predictions_inverse[:,0]})
+      # result = pd.DataFrame(data={'KHACHHANG_ID': id_test[:,0],'NGAY': ngay_test,'Actuals': y_test_inverse[:,0], 'Predictions':predictions_inverse[:,0]})
+      result = pd.DataFrame(data={'KHACHHANG_ID': id_test[:,0],'NGAY': ngay_test,'Actuals': y_test_inverse[:,0], 'Predictions':predictions_inverse[:,0], 'Ngay_ThanhLy': ngay_thanhly_test,'ThanhLy_Thucte':nhan_up_test[:,0]} )
+      
+      result['Difference'] = abs(result['Predictions'] - result['Actuals'])
 
-      return result
+      min_indices = result.groupby(['KHACHHANG_ID', 'NGAY'])['Difference'].idxmin()
 
-def predict_churn_down(x_test, y_test, id_test, ngay_test):
+      selected_rows = result.loc[min_indices]
+
+      selected_rows = selected_rows.drop(columns=['Difference'])
+
+
+      return selected_rows
+
+def predict_churn_down(x_test, y_test, id_test, ngay_test, ngay_thanhly, nhan):
       predictions = model_down.predict(x_test)
 
-      predictions_inverse = scaler_down.inverse_transform(predictions.reshape(-1, 1))
-      y_test_inverse = scaler_down.inverse_transform(y_test.reshape(-1, 1))
+      predictions_inverse = scaler_up.inverse_transform(predictions.reshape(-1, 1))
+      y_test_inverse = scaler_up.inverse_transform(y_test.reshape(-1, 1))
       id_test = id_test.reshape(-1, 1)
       ngay_test = ngay_test.reshape(-1, 1)
       ngay_test = pd.to_datetime(ngay_test[:,0])
+      ngay_thanhly_test = ngay_thanhly.reshape(-1,1)
+      ngay_thanhly_test = pd.to_datetime(ngay_thanhly_test[:,0])
+      nhan_up_test = nhan.reshape(-1,1)
       st.subheader(f'Kết quả dự đoán:')
-      result = pd.DataFrame(data={'KHACHHANG_ID': id_test[:,0],'NGAY': ngay_test,'Actuals': y_test_inverse[:,0], 'Predictions':predictions_inverse[:,0]})
+      # result = pd.DataFrame(data={'KHACHHANG_ID': id_test[:,0],'NGAY': ngay_test,'Actuals': y_test_inverse[:,0], 'Predictions':predictions_inverse[:,0]})
+      result = pd.DataFrame(data={'KHACHHANG_ID': id_test[:,0],'NGAY': ngay_test,'Actuals': y_test_inverse[:,0], 'Predictions':predictions_inverse[:,0], 'Ngay_ThanhLy': ngay_thanhly_test,'ThanhLy_Thucte':nhan_up_test[:,0]} )
+      
+      result['Difference'] = abs(result['Predictions'] - result['Actuals'])
 
-      return result
-############HÀM VẼ###############
+      min_indices = result.groupby(['KHACHHANG_ID', 'NGAY'])['Difference'].idxmin()
 
+      selected_rows = result.loc[min_indices]
+
+      selected_rows = selected_rows.drop(columns=['Difference'])
+
+
+      return selected_rows
 
 ############DỰNG LAYOUT, PHÂN TRANG, THAO TÁC###############
 st.set_page_config(layout="wide")
 
+hide_st_style = """
+            <style>
+            footer {visibility: hidden;}
+            </style>
+            """
 
+st.markdown(hide_st_style, unsafe_allow_html=True)
 
 if 'df' not in st.session_state:
     st.session_state.df = None
@@ -195,17 +233,18 @@ elif selected == 'Prediction':
                   customer_id_column = st.selectbox("Select column for Customer ID", columns)
                   date_column = st.selectbox("Select data for time serise", columns)
                   selected_model = st.selectbox("Select Machine Learning Model", ["LSTM for Upload", "LSTM for Download"])
-
+                  date_churn = st.selectbox("Select data for data churn", columns)
+                  lable_col = st.selectbox("Select data for label", columns)
                   if st.form_submit_button('Predict'):
                         st.markdown('<hr style="border:1px solid #F63366;">', unsafe_allow_html=True)
-                        X_test, y_test, id_test, ngay_test = create_time_series_data(st.session_state.df, data_column, customer_id_column, date_column, 23, 7)
+                        X_test, y_test, id_test, ngay_test, ngay_thanhly, nhan = create_time_series_data(st.session_state.df, data_column, customer_id_column, date_column, date_churn, lable_col, 23, 7)
                         X_test_up = np.reshape(X_test, (X_test.shape[0],X_test.shape[1], 1))
                         
                         if selected_model == "LSTM for Upload":
-                              kq = predict_churn_up(X_test_up, y_test, id_test, ngay_test)
+                              kq = predict_churn_up(X_test_up, y_test, id_test, ngay_test, ngay_thanhly, nhan)
                               st.write(kq)
                         elif selected_model == "LSTM for Download":
-                              kq = predict_churn_down(X_test_up, y_test, id_test, ngay_test)
+                              kq = predict_churn_down(X_test_up, y_test, id_test, ngay_test, ngay_thanhly, nhan)
                               st.write(kq)
 
 elif selected == 'Feedback':
