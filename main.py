@@ -92,7 +92,7 @@ def predict_churn_down(x_test, y_test, id_test, ngay_test, ngay_thanhly, nhan):
       ngay_thanhly_test = ngay_thanhly.reshape(-1,1)
       ngay_thanhly_test = pd.to_datetime(ngay_thanhly_test[:,0])
       nhan_up_test = nhan.reshape(-1,1)
-      st.subheader(f'Kết quả dự đoán:')
+      st.subheader(f'Kết quả dự đoán lưu lượng:')
       # result = pd.DataFrame(data={'KHACHHANG_ID': id_test[:,0],'NGAY': ngay_test,'Actuals': y_test_inverse[:,0], 'Predictions':predictions_inverse[:,0]})
       result = pd.DataFrame(data={'KHACHHANG_ID': id_test[:,0],'NGAY': ngay_test,'Actuals': y_test_inverse[:,0], 'Predictions':predictions_inverse[:,0], 'Ngay_ThanhLy': ngay_thanhly_test,'ThanhLy_Thucte':nhan_up_test[:,0]} )
       
@@ -106,7 +106,28 @@ def predict_churn_down(x_test, y_test, id_test, ngay_test, ngay_thanhly, nhan):
 
 
       return selected_rows
+def handle_after_predict(df, data, nguong):
+      st.subheader(f'Kết quả dự đoán nhãn:')
+      result_thanhly_1 = df[df['ThanhLy_Thucte'] == 1]
+      result_thanhly_1['7_days_before_ngay_thanhly'] = result_thanhly_1['Ngay_ThanhLy'] - pd.DateOffset(days=7)
+      result_thanhly_1_avg = result_thanhly_1.groupby('KHACHHANG_ID')['Predictions'].mean().reset_index()
 
+      result_thanhly_0 = df[df['ThanhLy_Thucte'] == 0]
+      max_ngay_thanhly_0 = result_thanhly_0.groupby('KHACHHANG_ID')['NGAY'].max().reset_index()
+      max_ngay_thanhly_0['7_days_before_max_ngay'] = max_ngay_thanhly_0['NGAY'] - pd.DateOffset(days=7)
+      result_thanhly_0_avg = result_thanhly_0.groupby('KHACHHANG_ID')['Predictions'].mean().reset_index()
+
+      final_result = pd.concat([result_thanhly_1_avg, result_thanhly_0_avg], ignore_index=True)
+
+      final_result['THANHLY_DUDOAN'] = final_result['Predictions'].apply(lambda x: 0 if x > nguong else 1)
+
+      new_data_test = data.loc[:, ['KHACHHANG_ID', 'THANHLY']]
+      grouped_data_test = new_data_test.groupby('KHACHHANG_ID').last()
+
+      merged_test = grouped_data_test.merge(final_result, on='KHACHHANG_ID')
+      merged_test =  merged_test.drop(['Predictions'], axis=1)
+
+      return merged_test
 ############DỰNG LAYOUT, PHÂN TRANG, THAO TÁC###############
 st.set_page_config(layout="wide")
 
@@ -220,6 +241,8 @@ elif selected == 'Draw Chart':
                         draw.plot_customer_data(final_data, x_axis, y_axis, customer_id_column)
                         st.markdown('<hr style="border:1px solid #F63366;">', unsafe_allow_html=True)
                         draw.trend_month(final_data, x_axis, y_axis)
+                        st.markdown('<hr style="border:1px solid #F63366;">', unsafe_allow_html=True)
+                        draw.trend_per_month(final_data, x_axis, y_axis)
             
 
 elif selected == 'Prediction':
@@ -232,9 +255,10 @@ elif selected == 'Prediction':
                   data_column = st.selectbox("Select data for predict", columns)
                   customer_id_column = st.selectbox("Select column for Customer ID", columns)
                   date_column = st.selectbox("Select data for time serise", columns)
-                  selected_model = st.selectbox("Select Machine Learning Model", ["LSTM for Upload", "LSTM for Download"])
-                  date_churn = st.selectbox("Select data for data churn", columns)
+                  date_churn = st.selectbox("Select data for date churn", columns)
                   lable_col = st.selectbox("Select data for label", columns)
+                  selected_model = st.selectbox("Select Machine Learning Model", ["LSTM for Upload", "LSTM for Download"])
+                  
                   if st.form_submit_button('Predict'):
                         st.markdown('<hr style="border:1px solid #F63366;">', unsafe_allow_html=True)
                         X_test, y_test, id_test, ngay_test, ngay_thanhly, nhan = create_time_series_data(st.session_state.df, data_column, customer_id_column, date_column, date_churn, lable_col, 23, 7)
@@ -243,9 +267,17 @@ elif selected == 'Prediction':
                         if selected_model == "LSTM for Upload":
                               kq = predict_churn_up(X_test_up, y_test, id_test, ngay_test, ngay_thanhly, nhan)
                               st.write(kq)
+                              draw.download_csv_button(kq, '⬇️ Tải xuống tại đây', 'kq_dudoan_luuluong')
+                              final_res = handle_after_predict(kq, st.session_state.df, 472.46)
+                              st.write(final_res)
+                              draw.download_csv_button(final_res, '⬇️ Tải xuống tại đây', 'kq_dudoan_nhan')
                         elif selected_model == "LSTM for Download":
                               kq = predict_churn_down(X_test_up, y_test, id_test, ngay_test, ngay_thanhly, nhan)
                               st.write(kq)
+                              draw.download_csv_button(kq, '⬇️ Tải xuống tại đây ', 'kq_dudoan_luuluong')
+                              final_res = handle_after_predict(kq, st.session_state.df, 5121.46)
+                              st.write(final_res)
+                              draw.download_csv_button(final_res, '⬇ Tải xuống tại đây', 'kq_dudoan_nhan')
 
 elif selected == 'Feedback':
       st.header(":mailbox: Please give me your comments to help me improve the application!!!")

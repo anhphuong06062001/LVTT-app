@@ -1,3 +1,4 @@
+import base64
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -31,6 +32,25 @@ def trend_month(data, x_column, columns):
 
       st.pyplot(fig)
 
+def trend_per_month(data, x_column, columns):
+    st.subheader(f'Biểu đồ biến động lưu lượng {columns} của từng khách hàng trong từng tháng')
+
+    # Group the data by customer ID and resample for each customer
+    grouped_data = data.groupby('KHACHHANG_ID').resample('M', on=x_column)[columns].mean()
+
+    # Plot the trend for each customer on the same chart
+    fig, ax = plt.subplots(figsize=(12, 6))
+    for customer_id, customer_data in grouped_data.groupby(level=0):
+        ax.plot(customer_data.index.get_level_values(x_column), customer_data.values, marker='o', linestyle='-')
+
+    ax.set_xlabel("Tháng")
+    ax.set_ylabel(f"Trung bình Lưu lượng {columns}")
+    ax.grid(True)
+    plt.xticks(rotation=45)
+    ax.legend()
+
+    st.pyplot(fig)
+
 def show_data_info(data, unique_customers, label_column, id_col, date_col):
       st.markdown('<hr style="border:1px solid #F63366;">', unsafe_allow_html=True)
       st.subheader("Dữ liệu vừa import")
@@ -50,3 +70,26 @@ def show_data_info(data, unique_customers, label_column, id_col, date_col):
             fig, ax = plt.subplots(figsize=(8, 4))
             label_counts.plot(kind='bar', ax=ax)
             st.pyplot(fig)
+
+
+def download_csv_button(dataframe, icon, filename):
+    csv = dataframe.to_csv(index=False)
+    b64 = base64.b64encode(csv.encode()).decode()
+    
+    # Áp dụng CSS cho nút
+    css_style = """
+        display: inline-block;
+        padding: 10px 20px;
+        font-size: 16px;
+        font-weight: bold;
+        text-align: center;
+        text-decoration: none;
+        cursor: pointer;
+        border: 2px solid #3498db;
+        color: #3498db;
+        border-radius: 5px;
+        transition: background-color 0.3s;
+    """
+    
+    href = f'<a href="data:file/csv;base64,{b64}" download="{filename}.csv" style="{css_style}">{icon}</a>'
+    st.markdown(href, unsafe_allow_html=True)
