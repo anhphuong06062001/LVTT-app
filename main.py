@@ -10,8 +10,9 @@ from streamlit_option_menu import option_menu
 from function import func
 from streamlit_lottie import st_lottie
 from drawchart import draw
+from ml_processing import ml
 ############LOAD MODEL###############
-model_up = load_model('model\lstm_model-v2.h5')
+model_up = load_model('model\lstm_model-UP-complete.h5')
 scaler_up = joblib.load('model\scaler.joblib')
 
 model_down = load_model('model\lstm_model-DOWN.h5')
@@ -142,6 +143,9 @@ st.markdown(hide_st_style, unsafe_allow_html=True)
 if 'df' not in st.session_state:
     st.session_state.df = None
 
+if 'df_ml' not in st.session_state:
+    st.session_state.df_ml = None
+
 if 'id_col' not in st.session_state:
     st.session_state.id_col = None
 
@@ -160,8 +164,8 @@ if 'chart' not in st.session_state:
 with st.sidebar:
       selected = option_menu(
             menu_title = "Main Menu",
-            options = ['Home', 'Import Data', 'Draw Chart', 'Prediction', 'Feedback'],
-            icons=["house", "cloud-upload", "bar-chart-fill", "list-task", "people-fill"],
+            options = ['Home', 'Import Data', 'Draw Chart', 'Prediction LSTM','Orther model','Feedback'],
+            icons=["house", "cloud-upload", "bar-chart-fill", "list-task","motherboard-fill", "people-fill"],
             menu_icon="cast",
       )
 
@@ -278,7 +282,26 @@ elif selected == 'Prediction':
                               final_res = handle_after_predict(kq, st.session_state.df, 5121.46)
                               st.write(final_res)
                               draw.download_csv_button(final_res, '⬇ Tải xuống tại đây', 'kq_dudoan_nhan')
+elif selected == 'Orther model':
+      st.header("Model Machine learning")
+      uploaded_file = st.file_uploader("Upload file CSV or Excel", type=['csv', 'xlsx'])
 
+      with st.form(key="model"):
+            if uploaded_file is not None:
+                  st.session_state.df_ml = pd.read_csv(uploaded_file) 
+                  st.write('Preview of the imported data:')
+                  st.write(st.session_state.df_ml.head()) 
+                  X_train, X_test, y_train, y_test, makh_test = ml.data_processing(st.session_state.df_ml)
+                  selected_model = st.selectbox("Select Model", ["Decision Tree", "KNN", "Random Forest"])
+      
+                  if st.form_submit_button('Train'):
+                        if selected_model == "Decision Tree":
+                              ml.train_model(selected_model, X_train, y_train, X_test, y_test, makh_test)
+                        elif selected_model == "KNN":
+                              ml.train_model(selected_model, X_train, y_train, X_test, y_test, makh_test)
+                        elif selected_model == "Random Forest":
+                              ml.train_model(selected_model, X_train, y_train, X_test, y_test, makh_test)
+                              
 elif selected == 'Feedback':
       st.header(":mailbox: Please give me your comments to help me improve the application!!!")
 
