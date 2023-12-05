@@ -1,3 +1,4 @@
+from sklearn.metrics import confusion_matrix
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -109,25 +110,29 @@ def predict_churn_down(x_test, y_test, id_test, ngay_test, ngay_thanhly, nhan):
       return selected_rows
 def handle_after_predict(df, data, nguong):
       st.subheader(f'Kết quả dự đoán nhãn:')
-      result_thanhly_1 = df[df['ThanhLy_Thucte'] == 1]
-      result_thanhly_1['7_days_before_ngay_thanhly'] = result_thanhly_1['Ngay_ThanhLy'] - pd.DateOffset(days=7)
-      result_thanhly_1_avg = result_thanhly_1.groupby('KHACHHANG_ID')['Predictions'].mean().reset_index()
+      result_df = pd.DataFrame(columns=['KHACHHANG_ID', 'Trung binh'])
+      unique_customers = df['KHACHHANG_ID'].unique()
 
-      result_thanhly_0 = df[df['ThanhLy_Thucte'] == 0]
-      max_ngay_thanhly_0 = result_thanhly_0.groupby('KHACHHANG_ID')['NGAY'].max().reset_index()
-      max_ngay_thanhly_0['7_days_before_max_ngay'] = max_ngay_thanhly_0['NGAY'] - pd.DateOffset(days=7)
-      result_thanhly_0_avg = result_thanhly_0.groupby('KHACHHANG_ID')['Predictions'].mean().reset_index()
+      for customer_id in unique_customers:
+            customer_data = df[df['KHACHHANG_ID'] == customer_id]
+            max_date = customer_data['NGAY'].max()
 
-      final_result = pd.concat([result_thanhly_1_avg, result_thanhly_0_avg], ignore_index=True)
+            start_date = max_date - pd.DateOffset(days=7)
 
-      final_result['THANHLY_DUDOAN'] = final_result['Predictions'].apply(lambda x: 0 if x > nguong else 1)
+            filtered_data = customer_data[(customer_data['NGAY'] >= start_date) & (customer_data['NGAY'] <= max_date)]
+
+            average_value = filtered_data['Predictions'].mean()
+
+            result_df = result_df.append({'KHACHHANG_ID': customer_id, 'Trung binh': average_value}, ignore_index=True)
+
+      result_df['THANHLY_DUDOAN'] = result_df['Trung binh'].apply(lambda x: 0 if x > nguong else 1)
 
       new_data_test = data.loc[:, ['KHACHHANG_ID', 'THANHLY']]
       grouped_data_test = new_data_test.groupby('KHACHHANG_ID').last()
 
-      merged_test = grouped_data_test.merge(final_result, on='KHACHHANG_ID')
-      merged_test =  merged_test.drop(['Predictions'], axis=1)
-
+      merged_test = grouped_data_test.merge(result_df, on='KHACHHANG_ID')
+      merged_test =  merged_test.drop(['Trung binh'], axis=1)
+      merged_test.replace({0: 'No', 1: 'Yes'}, inplace=True)
       return merged_test
 ############DỰNG LAYOUT, PHÂN TRANG, THAO TÁC###############
 st.set_page_config(layout="wide")
@@ -249,7 +254,7 @@ elif selected == 'Draw Chart':
                         draw.trend_per_month(final_data, x_axis, y_axis)
             
 
-elif selected == 'Prediction':
+elif selected == 'Prediction LSTM':
       # session_state.page = 'Prediction'
       st.title('Prediction')
       with st.form(key="prediction"):
@@ -268,19 +273,28 @@ elif selected == 'Prediction':
                         X_test, y_test, id_test, ngay_test, ngay_thanhly, nhan = create_time_series_data(st.session_state.df, data_column, customer_id_column, date_column, date_churn, lable_col, 23, 7)
                         X_test_up = np.reshape(X_test, (X_test.shape[0],X_test.shape[1], 1))
                         
+                        nguong_up, nguong_down = func.tim_nguong(st.session_state.df)
+
                         if selected_model == "LSTM for Upload":
                               kq = predict_churn_up(X_test_up, y_test, id_test, ngay_test, ngay_thanhly, nhan)
                               st.write(kq)
                               draw.download_csv_button(kq, '⬇️ Tải xuống tại đây', 'kq_dudoan_luuluong')
-                              final_res = handle_after_predict(kq, st.session_state.df, 472.46)
+                             
+                              final_res = handle_after_predict(kq, st.session_state.df, nguong_up)
                               st.write(final_res)
+                              st.markdown('<hr style="border:1px solid #F63366;">', unsafe_allow_html=True)
+                              st.subheader("Kết quả dự đoán:")
+                              st.write(confusion_matrix(final_res['THANHLY'], final_res['THANHLY_DUDOAN']))
                               draw.download_csv_button(final_res, '⬇️ Tải xuống tại đây', 'kq_dudoan_nhan')
                         elif selected_model == "LSTM for Download":
                               kq = predict_churn_down(X_test_up, y_test, id_test, ngay_test, ngay_thanhly, nhan)
                               st.write(kq)
                               draw.download_csv_button(kq, '⬇️ Tải xuống tại đây ', 'kq_dudoan_luuluong')
-                              final_res = handle_after_predict(kq, st.session_state.df, 5121.46)
+                              final_res = handle_after_predict(kq, st.session_state.df, nguong_down)
                               st.write(final_res)
+                              st.markdown('<hr style="border:1px solid #F63366;">', unsafe_allow_html=True)
+                              st.subheader("Kết quả dự đoán:")
+                              st.write(confusion_matrix(final_res['THANHLY'], final_res['THANHLY_DUDOAN']))
                               draw.download_csv_button(final_res, '⬇ Tải xuống tại đây', 'kq_dudoan_nhan')
 elif selected == 'Orther model':
       st.header("Model Machine learning")

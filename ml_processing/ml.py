@@ -2,7 +2,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.metrics import accuracy_score, classification_report,confusion_matrix, precision_score, recall_score
+from sklearn.metrics import accuracy_score, classification_report,confusion_matrix, precision_score, recall_score, f1_score
 from imblearn.over_sampling import SMOTE
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.tree import DecisionTreeClassifier
@@ -62,11 +62,11 @@ def train_model(model_name, X_train, y_train, X_test, y_test, makh_test):
       accuracy = accuracy_score(y_test, y_pred)
       precision = precision_score(y_test, y_pred)
       recall = recall_score(y_test, y_pred)
-
+      f1 = f1_score(y_test, y_pred)
       # Create a DataFrame to display the metrics
       metrics_data = {
-            'Metric': ['Accuracy', 'Precision', 'Recall'],
-            'Score': [f"{round(accuracy, 2)*100}%", f"{round(precision, 2)*100}%", f"{round(recall,2)*100}%"]
+            'Metric': ['F1', 'Precision', 'Recall'],
+            'Score': [f"{round(f1, 2)*100}%", f"{round(precision, 2)*100}%", f"{round(recall,2)*100}%"]
       }
 
       metrics_df = pd.DataFrame(metrics_data)
