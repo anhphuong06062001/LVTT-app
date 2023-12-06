@@ -15,7 +15,7 @@ def data_processing(df):
       df.drop('PHUONGXA', axis = 'columns', inplace=True)
 
       #lable encoder
-      label_encoder = LabelEncoder()
+      label_encoder = LabelEncoder()      
       for column in df.select_dtypes(include='object').columns:
             df[column] = label_encoder.fit_transform(df[column])
 

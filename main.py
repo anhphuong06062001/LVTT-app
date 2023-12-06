@@ -117,7 +117,7 @@ def handle_after_predict(df, data, nguong):
             customer_data = df[df['KHACHHANG_ID'] == customer_id]
             max_date = customer_data['NGAY'].max()
 
-            start_date = max_date - pd.DateOffset(days=7)
+            start_date = max_date - pd.DateOffset(days=31)
 
             filtered_data = customer_data[(customer_data['NGAY'] >= start_date) & (customer_data['NGAY'] <= max_date)]
 
@@ -271,31 +271,34 @@ elif selected == 'Prediction LSTM':
                   if st.form_submit_button('Predict'):
                         st.markdown('<hr style="border:1px solid #F63366;">', unsafe_allow_html=True)
                         X_test, y_test, id_test, ngay_test, ngay_thanhly, nhan = create_time_series_data(st.session_state.df, data_column, customer_id_column, date_column, date_churn, lable_col, 23, 7)
-                        X_test_up = np.reshape(X_test, (X_test.shape[0],X_test.shape[1], 1))
-                        
-                        nguong_up, nguong_down = func.tim_nguong(st.session_state.df)
+                        # X_test_up = np.reshape(X_test, (X_test.shape[0],X_test.shape[1], 1))
 
                         if selected_model == "LSTM for Upload":
+                              X_test_up = np.reshape(X_test, (X_test.shape[0],X_test.shape[1], 1))
                               kq = predict_churn_up(X_test_up, y_test, id_test, ngay_test, ngay_thanhly, nhan)
                               st.write(kq)
                               draw.download_csv_button(kq, '⬇️ Tải xuống tại đây', 'kq_dudoan_luuluong')
-                             
-                              final_res = handle_after_predict(kq, st.session_state.df, nguong_up)
+                              #nguong_up, nguong_down = func.tim_nguong(st.session_state.df)     
+                              final_res = handle_after_predict(kq, st.session_state.df, 449.8396159199997)
                               st.write(final_res)
+                              draw.download_csv_button(final_res, '⬇️ Tải xuống tại đây', 'kq_dudoan_nhan')
                               st.markdown('<hr style="border:1px solid #F63366;">', unsafe_allow_html=True)
                               st.subheader("Kết quả dự đoán:")
                               st.write(confusion_matrix(final_res['THANHLY'], final_res['THANHLY_DUDOAN']))
-                              draw.download_csv_button(final_res, '⬇️ Tải xuống tại đây', 'kq_dudoan_nhan')
+            
                         elif selected_model == "LSTM for Download":
-                              kq = predict_churn_down(X_test_up, y_test, id_test, ngay_test, ngay_thanhly, nhan)
+                              X_test_down = np.reshape(X_test, (X_test.shape[0],X_test.shape[1], 1))
+                              kq = predict_churn_down(X_test_down, y_test, id_test, ngay_test, ngay_thanhly, nhan)
                               st.write(kq)
                               draw.download_csv_button(kq, '⬇️ Tải xuống tại đây ', 'kq_dudoan_luuluong')
-                              final_res = handle_after_predict(kq, st.session_state.df, nguong_down)
+                              # nguong_up, nguong_down = func.tim_nguong(st.session_state.df)
+                              final_res = handle_after_predict(kq, st.session_state.df, 10696.804957639999)
                               st.write(final_res)
+                              draw.download_csv_button(final_res, '⬇ Tải xuống tại đây', 'kq_dudoan_nhan')
                               st.markdown('<hr style="border:1px solid #F63366;">', unsafe_allow_html=True)
                               st.subheader("Kết quả dự đoán:")
                               st.write(confusion_matrix(final_res['THANHLY'], final_res['THANHLY_DUDOAN']))
-                              draw.download_csv_button(final_res, '⬇ Tải xuống tại đây', 'kq_dudoan_nhan')
+                              
 elif selected == 'Orther model':
       st.header("Model Machine learning")
       uploaded_file = st.file_uploader("Upload file CSV or Excel", type=['csv', 'xlsx'])
